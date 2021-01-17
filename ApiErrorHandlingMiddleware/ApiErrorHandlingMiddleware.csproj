@@ -5,6 +5,7 @@
         <Version>1.0.0</Version>
         <Authors>Samuel Bagattin</Authors>
         <Company>Samuel Bagattin</Company>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
     
     <PropertyGroup>
