@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Net;
 using System.Threading.Tasks;
+using ApiErrorHandlingMiddleware.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 
 namespace ApiErrorHandlingMiddleware
 {
-        public class ErrorHandlingMiddleware
+    internal class ErrorHandlingMiddleware
     {
-        private readonly RequestDelegate next;
+        private readonly RequestDelegate _next;
 
         /// <summary>
         /// Initialize new instance of the <see cref="ErrorHandlingMiddleware"/>
@@ -16,7 +17,7 @@ namespace ApiErrorHandlingMiddleware
         /// <param name="next"></param>
         public ErrorHandlingMiddleware(RequestDelegate next)
         {
-            this.next = next;
+            _next = next;
         }
 
         /// <summary>
@@ -27,31 +28,15 @@ namespace ApiErrorHandlingMiddleware
         {
             try
             {
-                await next(context);
+                await _next(context);
             }
-            catch (NotFoundException ex)
+            catch (BaseException ex)
             {
-                await HandleExceptionAsync(context, HttpStatusCode.NotFound, ex);
+                await HandleBaseExceptionAsync(context, ex.HttpStatusCode, ex);
             }
-            catch (UnauthorizedException)
+            catch (Exception)
             {
-                await HandleExceptionAsync(context, HttpStatusCode.Unauthorized);
-            }
-            catch (ConflictException ex)
-            {
-                await HandleExceptionAsync(context, HttpStatusCode.Conflict, ex);
-            }
-            catch (BadRequestException ex)
-            {
-                await HandleExceptionAsync(context, HttpStatusCode.BadRequest, ex);
-            }
-            catch (InternalServerErrorException ex)
-            {
-                await HandleExceptionAsync(context, HttpStatusCode.InternalServerError, ex);
-            }
-            catch (UnprocessableEntityException ex)
-            {
-                await HandleExceptionAsync(context, HttpStatusCode.UnprocessableEntity, ex);
+                await HandleExceptionAsync(context);
             }
         }
 
@@ -62,27 +47,53 @@ namespace ApiErrorHandlingMiddleware
         /// <param name="httpCode">Http error code</param>
         /// <param name="exception">Exception</param>
         /// <returns>Response</returns>
-        private static Task HandleExceptionAsync(HttpContext context, HttpStatusCode httpCode, Exception exception = null)
+        private static Task HandleBaseExceptionAsync(
+            HttpContext context,
+            HttpStatusCode httpCode,
+            Exception exception = null
+        )
         {
             var result = string.Empty;
             if (exception != null)
             {
-                result = JsonConvert.SerializeObject(new ApiErrorModel{Error = exception.Message});
+                result = JsonConvert.SerializeObject(new ApiErrorModel
+                    {StatusCode = (ushort) httpCode, Error = exception.Message});
             }
 
             context.Response.ContentType = "application/json";
-            context.Response.StatusCode = (int)httpCode;
+            context.Response.StatusCode = (int) httpCode;
             return context.Response.WriteAsync(result);
         }
-    }
-        /// <summary>
-        /// Model used to return errors from github manager api
-        /// </summary>
-        public class ApiErrorModel
+
+        private static Task HandleExceptionAsync(HttpContext context)
         {
-            /// <summary>
-            /// Value of the error in api model.
-            /// </summary>
-            public string Error { get; set; }
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int) HttpStatusCode.InternalServerError;
+            return context.Response.WriteAsync(
+                JsonConvert.SerializeObject(
+                    new ApiErrorModel
+                    {
+                        StatusCode = 500,
+                        Error = "Internal Server Error"
+                    }
+                )
+            );
         }
+    }
+
+    /// <summary>
+    /// Model used to return errors the api
+    /// </summary>
+    public class ApiErrorModel
+    {
+        /// <summary>
+        /// Http status code of the exception
+        /// </summary>
+        public ushort StatusCode { get; set; }
+
+        /// <summary>
+        /// Value of the error in api model.
+        /// </summary>
+        public string Error { get; set; }
+    }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,14 +12,13 @@ namespace ApiErrorHandlingMiddleware
             serviceCollection.Configure<ApiBehaviorOptions>(options =>
             {
                 options.InvalidModelStateResponseFactory = context =>
-                {
-                    return new BadRequestObjectResult(new ApiErrorModel
+                    new BadRequestObjectResult(new ApiErrorModel
                     {
+                        StatusCode = (int) HttpStatusCode.BadRequest,
                         Error = string.Join(" ",
                             context.ModelState.SelectMany(state =>
                                 state.Value.Errors.Select(error => error.ErrorMessage)))
                     });
-                };
             });
             return serviceCollection;
         }
